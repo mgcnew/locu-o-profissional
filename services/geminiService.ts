@@ -5,15 +5,15 @@ export const refineTextForRetail = async (text: string): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
-    contents: `Você é um engenheiro de som e locutor sênior. Converta o texto abaixo em um formato SSML (Speech Synthesis Markup Language) otimizado para varejo.
+    contents: `Você é um engenheiro de som e locutor sênior. Converta o texto abaixo em um formato SSML otimizado para varejo.
     
-    OBJETIVO: O texto deve ser detalhado para durar cerca de 30 segundos. Se o texto original for curto, amplie-o com frases vendedoras e descrições apetitosas.
+    OBJETIVO: Locução rica e fluida entre 30-40 segundos. 
+    Evite clichês robóticos. Use uma linguagem humana e persuasiva.
     
-    REGRAS DE MARCAÇÃO:
-    - Use <emphasis level="strong"> para preços e palavras-chave.
-    - Use <break time="600ms"/> entre blocos de informação para criar suspense.
-    - Use <prosody pitch="+10%" rate="medium"> para o corpo do texto e <prosody rate="fast"> apenas para urgência final.
-    - Use <prosody volume="loud"> para chamadas principais.
+    REGRAS SSML:
+    - <emphasis level="strong"> para o valor numérico.
+    - <break time="700ms"/> para transições de assunto.
+    - <prosody pitch="+5%" rate="95%"> para o corpo do texto.
     
     TEXTO ORIGINAL:
     "${text}"
@@ -23,34 +23,41 @@ export const refineTextForRetail = async (text: string): Promise<string> => {
   return response.text?.trim() || text;
 };
 
-export const generateRetailCopy = async (briefing: string, storeName?: string, sector?: string): Promise<string> => {
+export const generateRetailCopy = async (briefing: string, storeName?: string, sector?: string, style: string = 'vendedor'): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
+  const styles: Record<string, string> = {
+    vendedor: "Estilo Clássico Varejo: Enérgico, direto, focado na oportunidade do dia. Use frases como 'Para tudo o que você está fazendo' ou 'Aproveite agora'.",
+    gourmet: "Estilo Especialista/Gourmet: Foco na qualidade, origem do corte, marmoreio da carne ou frescor orgânico. Linguagem refinada, valorizando o prazer de comer bem.",
+    familia: "Estilo Amigo da Família: Foco no carinho, na mesa cheia, na economia para o lar. Use um tom acolhedor, falando sobre cuidar de quem amamos.",
+    urgencia: "Estilo Oferta Relâmpago: Agressivo, rápido, focado no cronômetro. 'É só enquanto durar o estoque', 'Últimas unidades'."
+  };
+
   const identityContext = (storeName || sector) 
     ? `\nCONTEXTO: ${storeName ? `Loja: ${storeName}.` : ''} ${sector ? `Setor: ${sector}.` : ''}`
     : "";
 
   const response = await ai.models.generateContent({
     model: 'gemini-3-pro-preview',
-    contents: `Você é um Copywriter e Diretor de Voz especialista em rádio de varejo. 
-    Sua missão é criar um roteiro PROFISSIONAL e COMPLETO de aproximadamente 30 segundos (cerca de 60 a 80 palavras bem pausadas).
+    contents: `Você é um Copywriter de elite para rádio comercial. 
+    Crie um roteiro de locução ÚNICO e CRIATIVO de 30 a 40 segundos.
+    
     ${identityContext}
+    VIBE DO ROTEIRO: ${styles[style]}
     
     INFORMAÇÕES DA OFERTA: "${briefing}"
     
-    ESTRUTURA OBRIGATÓRIA (Use SSML):
-    1. INTRODUÇÃO (5s): Saudação calorosa e nome da loja.
-    2. DESENVOLVIMENTO (10s): Descreva a qualidade, o frescor ou o sabor do produto. Use adjetivos que deem "água na boca".
-    3. A OFERTA (7s): O preço com ênfase máxima e pausas antes do valor.
-    4. SUGESTÃO (5s): Sugira um item que combina (ex: se for carne, sugira carvão ou tempero).
-    5. FECHAMENTO (3s): Chamada para ação urgente e localização dentro da loja.
-
-    REGRAS TÉCNICAS SSML:
-    - Use <emphasis level="strong"> em preços.
-    - Use <break time="500ms"/> para separar as seções.
-    - Use <prosody pitch="+5%"> para entusiasmo.
+    PROIBIÇÕES:
+    - NÃO comece sempre com "Olá cliente amigo".
+    - NÃO seja repetitivo. Varie a estrutura das frases.
+    - NÃO use apenas o preço; crie uma mini-história em volta do produto.
     
-    Retorne apenas o roteiro em formato SSML pronto para locução.`,
+    REQUISITOS:
+    - Use tags SSML (<emphasis>, <break>, <prosody>).
+    - Mínimo de 90 palavras para garantir o tempo de 30s-40s.
+    - Se for carne, fale do cheiro, da maciez. Se for mercado, fale da facilidade e economia.
+    
+    Retorne apenas o roteiro em formato SSML.`,
   });
   return response.text?.trim() || "";
 };
@@ -65,10 +72,10 @@ export const generateRetailAudio = async (
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const styleInstructions = {
-    vendedor: "Voz enérgica de rádio FM, estilo animador de palco. Fale com clareza e entusiasmo.",
-    urgencia: "Voz rápida, mas compreensível. Tom de oportunidade única.",
-    amigavel: "Voz calorosa, rindo com a voz, acolhedora.",
-    institucional: "Voz polida, elegante e com autoridade."
+    vendedor: "Voz enérgica de rádio FM.",
+    urgencia: "Voz rápida e impactante.",
+    amigavel: "Voz calorosa e acolhedora.",
+    institucional: "Voz polida e elegante."
   };
 
   const performancePrompt = styleInstructions[style as keyof typeof styleInstructions] || styleInstructions.vendedor;
@@ -77,10 +84,8 @@ export const generateRetailAudio = async (
     model: "gemini-2.5-flash-preview-tts",
     contents: [{ 
       parts: [{ 
-        text: `Você é um locutor de rádio profissional de elite. Interprete as tags SSML abaixo. 
-        Mantenha um ritmo cadenciado para que a locução dure o tempo planejado (aproximadamente 30 segundos).
-        Não corra com o texto, valorize as pausas (<break>).
-        
+        text: `Interprete este roteiro SSML. RITMO CALMO para durar 35 segundos. 
+        Mantenha a naturalidade de um locutor de verdade.
         ESTILO: ${performancePrompt}. 
         VELOCIDADE BASE: ${speed}. 
         PITCH BASE: ${pitch}.
@@ -100,8 +105,6 @@ export const generateRetailAudio = async (
   });
 
   const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-  if (!base64Audio) {
-    throw new Error("Falha na renderização.");
-  }
+  if (!base64Audio) throw new Error("Erro na geração.");
   return base64Audio;
 };
